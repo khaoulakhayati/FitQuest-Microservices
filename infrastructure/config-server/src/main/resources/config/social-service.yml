@@ -1,0 +1,4 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_SOCIAL_USER:root}:${MONGO_SOCIAL_PASSWORD:root}@${MONGO_SOCIAL_HOST:localhost}:${MONGO_SOCIAL_PORT:27018}/${MONGO_SOCIAL_DB:fitquest_social}?authSource=admin

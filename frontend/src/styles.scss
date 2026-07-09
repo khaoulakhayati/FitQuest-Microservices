@@ -1,0 +1,87 @@
+@import '@angular/material/prebuilt-themes/azure-blue.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --fq-bg: #f6f8fb;
+  --fq-shell: #ffffff;
+  --fq-surface: #ffffff;
+  --fq-surface-soft: #f1f5f9;
+  --fq-border: #d9e2ec;
+  --fq-text: #172033;
+  --fq-muted: #667085;
+  --fq-accent: #2563eb;
+  --fq-accent-dim: #1d4ed8;
+  --fq-accent-soft: #e8f0ff;
+  --fq-success: #15803d;
+  --fq-warning: #b45309;
+  --fq-danger: #dc2626;
+}
+
+html.dark {
+  --fq-bg: #111827;
+  --fq-shell: #0f172a;
+  --fq-surface: #172033;
+  --fq-surface-soft: #1f2a3d;
+  --fq-border: #334155;
+  --fq-text: #f8fafc;
+  --fq-muted: #aab4c3;
+  --fq-accent: #60a5fa;
+  --fq-accent-dim: #3b82f6;
+  --fq-accent-soft: rgba(96, 165, 250, 0.14);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: var(--fq-bg);
+  color: var(--fq-text);
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-lg border;
+    background: var(--fq-surface);
+    border-color: var(--fq-border);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .btn-primary {
+    @apply rounded-md px-4 py-2.5 text-sm font-semibold transition-colors;
+    background: var(--fq-accent);
+    color: #ffffff;
+  }
+
+  .btn-primary:hover {
+    background: var(--fq-accent-dim);
+  }
+
+  .page-title {
+    @apply text-2xl font-semibold;
+    color: var(--fq-text);
+  }
+
+  .stat-value {
+    @apply text-3xl font-semibold;
+    color: var(--fq-text);
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-wide;
+    color: var(--fq-muted);
+  }
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mat-mdc-form-field {
+  --mdc-outlined-text-field-outline-color: var(--fq-border);
+  --mdc-outlined-text-field-focus-outline-color: var(--fq-accent);
+  --mdc-outlined-text-field-label-text-color: var(--fq-muted);
+}

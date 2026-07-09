@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_GAMIFICATION_HOST:localhost}:${POSTGRES_GAMIFICATION_PORT:5433}/${POSTGRES_GAMIFICATION_DB:fitquest_gamification}
+    username: ${POSTGRES_GAMIFICATION_USER:postgres}
+    password: ${POSTGRES_GAMIFICATION_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update

@@ -1,0 +1,53 @@
+server:
+  port: ${AUTH_SERVICE_PORT:8081}
+
+spring:
+  application:
+    name: auth-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/fitquest}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/fitquest/protocol/openid-connect/certs}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+fitquest:
+  keycloak:
+    enabled: ${KEYCLOAK_ENABLED:true}
+    token-uri: ${KEYCLOAK_TOKEN_URI:http://localhost:8180/realms/fitquest/protocol/openid-connect/token}
+    users-uri: ${KEYCLOAK_USERS_URI:http://localhost:8180/admin/realms/fitquest/users}
+    frontend-client-id: ${KEYCLOAK_FRONTEND_CLIENT_ID:fitquest-frontend}
+    backend-client-id: ${KEYCLOAK_BACKEND_CLIENT_ID:fitquest-backend}
+    backend-client-secret: ${KEYCLOAK_BACKEND_CLIENT_SECRET:fitquest-backend-secret}
+  jwt:
+    secret: ${JWT_SECRET:fitquest-super-secret-key-change-in-production-min-256-bits}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+  rabbitmq:
+    exchange: fitquest.events
+    routing-key:
+      user-registered: user.registered
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.fitquest: INFO

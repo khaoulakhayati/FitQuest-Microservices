@@ -1,0 +1,56 @@
+server:
+  port: ${CHALLENGE_SERVICE_PORT:8084}
+
+spring:
+  application:
+    name: challenge-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/fitquest}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/fitquest/protocol/openid-connect/certs}
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:root@${MONGO_CHALLENGE_HOST:localhost}:${MONGO_CHALLENGE_PORT:27017}/fitquest_challenge?authSource=admin}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+fitquest:
+  rabbitmq:
+    exchange: fitquest.events
+    routing-key:
+      challenge-created: challenge.created
+      challenge-completed: challenge.completed
+      participant-scored: participant.scored
+    queue:
+      workout-completed: challenge.workout.completed
+      user-events: challenge.user.events
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.fitquest: INFO

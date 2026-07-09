@@ -1,0 +1,112 @@
+{
+  "realm": "fitquest",
+  "enabled": true,
+  "displayName": "FitQuest",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "ROLE_USER", "description": "Standard FitQuest user" },
+      { "name": "ROLE_COACH", "description": "FitQuest coach" },
+      { "name": "ROLE_ADMIN", "description": "FitQuest administrator" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "fitquest-frontend",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:4200/*"],
+      "webOrigins": ["http://localhost:4200", "http://localhost:8080"],
+      "protocolMappers": [
+        {
+          "name": "fitquest-user-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "fitquest_user_id",
+            "claim.name": "fitquest_user_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "fitquest-backend",
+      "enabled": true,
+      "secret": "fitquest-backend-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-fitquest-backend",
+      "enabled": true,
+      "serviceAccountClientId": "fitquest-backend",
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users"]
+      }
+    },
+    {
+      "username": "demouser",
+      "enabled": true,
+      "email": "demo@fitquest.com",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Demo1234!", "temporary": false }
+      ],
+      "attributes": {
+        "fitquest_user_id": ["1"]
+      },
+      "realmRoles": ["ROLE_USER"]
+    },
+    {
+      "username": "coach",
+      "enabled": true,
+      "email": "coach@fitquest.com",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Coach1234!", "temporary": false }
+      ],
+      "attributes": {
+        "fitquest_user_id": ["2"]
+      },
+      "realmRoles": ["ROLE_COACH"]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@fitquest.com",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Admin1234!", "temporary": false }
+      ],
+      "attributes": {
+        "fitquest_user_id": ["3"]
+      },
+      "realmRoles": ["ROLE_ADMIN"]
+    },
+    {
+      "username": "keycloak-demo",
+      "enabled": true,
+      "email": "keycloak-demo@fitquest.com",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Demo1234!", "temporary": false }
+      ],
+      "attributes": {
+        "fitquest_user_id": ["1"]
+      },
+      "realmRoles": ["ROLE_USER"]
+    }
+  ]
+}
