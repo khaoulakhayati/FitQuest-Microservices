@@ -1,0 +1,45 @@
+package com.fitquest.challenge.entity;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.Instant;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "challenges")
+public class Challenge {
+
+    @Id
+    private String id;
+
+    @Indexed
+    private String title;
+
+    private String description;
+
+    private ChallengeType type;
+
+    private ChallengeStatus status;
+
+    private Instant startDate;
+
+    private Instant endDate;
+
+    private int goalPoints;
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
+}
