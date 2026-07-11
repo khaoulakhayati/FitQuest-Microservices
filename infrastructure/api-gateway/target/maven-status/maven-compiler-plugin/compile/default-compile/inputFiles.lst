@@ -1,0 +1,4 @@
+C:\Users\Med Salah\fitquest\infrastructure\api-gateway\src\main\java\com\fitquest\gateway\ApiGatewayApplication.java
+C:\Users\Med Salah\fitquest\infrastructure\api-gateway\src\main\java\com\fitquest\gateway\config\GatewayConfig.java
+C:\Users\Med Salah\fitquest\infrastructure\api-gateway\src\main\java\com\fitquest\gateway\config\SecurityConfig.java
+C:\Users\Med Salah\fitquest\infrastructure\api-gateway\src\main\java\com\fitquest\gateway\filter\JwtAuthenticationFilter.java

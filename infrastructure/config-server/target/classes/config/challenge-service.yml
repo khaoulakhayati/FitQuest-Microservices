@@ -1,0 +1,4 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_CHALLENGE_USER:root}:${MONGO_CHALLENGE_PASSWORD:root}@${MONGO_CHALLENGE_HOST:localhost}:${MONGO_CHALLENGE_PORT:27017}/${MONGO_CHALLENGE_DB:fitquest_challenge}?authSource=admin

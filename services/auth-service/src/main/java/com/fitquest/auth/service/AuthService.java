@@ -15,11 +15,19 @@ import com.fitquest.auth.repository.UserRepository;
 import com.fitquest.auth.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +41,10 @@ public class AuthService {
     private final UserMapper userMapper;
     private final UserEventPublisher eventPublisher;
     private final KeycloakService keycloakService;
+
+    @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
+    private String keycloakJwkSetUri;
+    private JwtDecoder keycloakJwtDecoder;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -74,22 +86,32 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request) {
         if (keycloakService.isEnabled()) {
-            try {
-                KeycloakTokenResponse keycloakTokens = keycloakService.authenticate(request.getEmail(), request.getPassword());
-                User user = userRepository.findByEmail(request.getEmail())
-                        .orElseGet(() -> provisionLocalUserFromKeycloak(request));
-                keycloakService.syncFitquestUserId(user.getEmail(), user.getId());
-                keycloakTokens = keycloakService.authenticate(request.getEmail(), request.getPassword());
-                return buildAuthResponse(user, keycloakTokens);
-            } catch (UnauthorizedException ex) {
-                log.warn("Keycloak login failed for {}; trying local credentials", request.getEmail());
-            }
+            KeycloakTokenResponse keycloakTokens = keycloakService.authenticate(request.getEmail(), request.getPassword());
+            User user = userRepository.findByEmail(request.getEmail())
+                    .orElseGet(() -> provisionLocalUserFromKeycloak(request));
+            keycloakService.syncFitquestUserId(user.getEmail(), user.getId());
+            keycloakTokens = keycloakService.authenticate(request.getEmail(), request.getPassword());
+            return buildAuthResponse(user, keycloakTokens);
         }
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
         validateLocalPassword(request, user);
         return buildAuthResponse(user, null);
+    }
+
+    @Transactional
+    public AuthResponse loginWithKeycloakToken(KeycloakLoginRequest request) {
+        Jwt jwt = decodeKeycloakToken(request.getAccessToken());
+        String email = firstNonBlank(jwt.getClaimAsString("email"), jwt.getClaimAsString("preferred_username"));
+        if (!StringUtils.hasText(email)) {
+            throw new UnauthorizedException("Keycloak token is missing an email");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseGet(() -> provisionLocalUserFromKeycloakToken(jwt, email));
+        keycloakService.syncFitquestUserId(user.getEmail(), user.getId());
+        return buildAuthResponse(user, new KeycloakTokenResponse(request.getAccessToken(), null, null, "Bearer"));
     }
 
     public AuthResponse refresh(RefreshTokenRequest request) {
@@ -138,6 +160,72 @@ public class AuthService {
         user = userRepository.save(user);
         eventPublisher.publishUserRegistered(user.getId(), user.getEmail(), user.getUsername());
         return user;
+    }
+
+    private User provisionLocalUserFromKeycloakToken(Jwt jwt, String email) {
+        String preferredUsername = firstNonBlank(jwt.getClaimAsString("preferred_username"), email);
+        String username = preferredUsername.contains("@")
+                ? preferredUsername.substring(0, preferredUsername.indexOf("@"))
+                : preferredUsername;
+        if (userRepository.existsByUsername(username)) {
+            username = username + "-" + System.currentTimeMillis();
+        }
+
+        Role role = roleRepository.findByName(primaryRole(jwt))
+                .orElseThrow(() -> new BadRequestException("Default role not configured"));
+        User user = User.builder()
+                .email(email)
+                .username(username)
+                .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                .roles(Set.of(role))
+                .build();
+        user.setProfile(UserProfile.builder()
+                .user(user)
+                .displayName(firstNonBlank(jwt.getClaimAsString("name"), username))
+                .fitnessGoal("GENERAL_FITNESS")
+                .build());
+        user = userRepository.save(user);
+        eventPublisher.publishUserRegistered(user.getId(), user.getEmail(), user.getUsername());
+        return user;
+    }
+
+    private Jwt decodeKeycloakToken(String accessToken) {
+        if (!StringUtils.hasText(keycloakJwkSetUri)) {
+            throw new UnauthorizedException("Keycloak token validation is not configured");
+        }
+        try {
+            if (keycloakJwtDecoder == null) {
+                keycloakJwtDecoder = NimbusJwtDecoder.withJwkSetUri(keycloakJwkSetUri).build();
+            }
+            return keycloakJwtDecoder.decode(accessToken);
+        } catch (Exception ex) {
+            throw new UnauthorizedException("Invalid Keycloak token");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String primaryRole(Jwt jwt) {
+        Object realmAccess = jwt.getClaims().get("realm_access");
+        if (realmAccess instanceof Map<?, ?> realmAccessMap) {
+            Object roles = realmAccessMap.get("roles");
+            if (roles instanceof Collection<?> roleValues) {
+                Set<String> roleNames = roleValues.stream()
+                        .map(String::valueOf)
+                        .collect(java.util.stream.Collectors.toSet());
+                if (roleNames.contains("ROLE_ADMIN")) return "ROLE_ADMIN";
+                if (roleNames.contains("ROLE_COACH")) return "ROLE_COACH";
+            }
+        }
+        return "ROLE_USER";
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private void validateLocalPassword(LoginRequest request, User user) {

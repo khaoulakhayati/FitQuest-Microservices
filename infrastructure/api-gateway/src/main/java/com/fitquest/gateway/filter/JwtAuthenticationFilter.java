@@ -3,6 +3,8 @@ package com.fitquest.gateway.filter;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -21,17 +23,23 @@ import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/auth/register", "/auth/login", "/auth/refresh",
+            "/auth/register", "/auth/login", "/auth/keycloak", "/auth/refresh",
             "/actuator", "/v3/api-docs", "/swagger-ui"
     );
 
@@ -39,14 +47,11 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     private String jwtSecret;
 
     private final ReactiveJwtDecoder keycloakJwtDecoder;
-    private final String keycloakIssuerUri;
-
     public JwtAuthenticationFilter(
             @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}") String issuerUri,
             @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") String jwkSetUri
     ) {
         super(Config.class);
-        this.keycloakIssuerUri = issuerUri;
         this.keycloakJwtDecoder = StringUtils.hasText(jwkSetUri)
                 ? NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : null;
@@ -66,9 +71,13 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             String token = authHeader.substring(7);
             try {
                 Claims claims = parseToken(token);
+                String roles = firstNonBlank(claims.get("roles", String.class), "");
+                if (!hasRequiredRole(config, roles)) {
+                    return forbidden(exchange);
+                }
                 return chain.filter(withLocalClaims(exchange, claims));
             } catch (Exception e) {
-                return decodeKeycloakToken(exchange, chain, token);
+                return decodeKeycloakToken(exchange, chain, token, config);
             }
         };
     }
@@ -102,41 +111,67 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     private Mono<Void> decodeKeycloakToken(ServerWebExchange exchange,
                                            org.springframework.cloud.gateway.filter.GatewayFilterChain chain,
-                                           String token) {
+                                           String token,
+                                           Config config) {
         if (keycloakJwtDecoder == null) {
             return unauthorized(exchange);
         }
         return keycloakJwtDecoder.decode(token)
-                .filter(this::hasExpectedIssuer)
-                .flatMap(jwt -> chain.filter(withKeycloakClaims(exchange, jwt)))
-                .switchIfEmpty(Mono.defer(() -> unauthorized(exchange)))
-                .onErrorResume(ex -> unauthorized(exchange));
+                .onErrorResume(ex -> {
+                    log.warn("Keycloak JWT rejected: {}", ex.getMessage());
+                    return Mono.empty();
+                })
+                .flatMap(jwt -> {
+                    String roles = extractRoles(jwt);
+                    log.info("Accepted Keycloak JWT for path {} issuer {} user {} roles {}",
+                            exchange.getRequest().getURI().getPath(),
+                            jwt.getIssuer(),
+                            firstNonBlank(jwt.getClaimAsString("fitquest_user_id"), jwt.getSubject()),
+                            roles);
+                    if (!hasRequiredRole(config, roles)) {
+                        log.warn("Keycloak JWT forbidden for path {} because roles {} do not match {}",
+                                exchange.getRequest().getURI().getPath(),
+                                roles,
+                                config.allowedRoles);
+                        return forbidden(exchange);
+                    }
+                    return chain.filter(withKeycloakClaims(exchange, jwt, roles));
+                })
+                .switchIfEmpty(Mono.defer(() -> unauthorized(exchange)));
     }
 
-    private boolean hasExpectedIssuer(Jwt jwt) {
-        return !StringUtils.hasText(keycloakIssuerUri)
-                || (jwt.getIssuer() != null && keycloakIssuerUri.equals(jwt.getIssuer().toString()));
-    }
-
-    private ServerWebExchange withKeycloakClaims(ServerWebExchange exchange, Jwt jwt) {
+    private ServerWebExchange withKeycloakClaims(ServerWebExchange exchange, Jwt jwt, String roles) {
         return withUserHeaders(exchange, Map.of(
                 "X-User-Id", firstNonBlank(jwt.getClaimAsString("fitquest_user_id"), jwt.getClaimAsString("user_id"), jwt.getSubject()),
                 "X-User-Email", firstNonBlank(jwt.getClaimAsString("email"), ""),
                 "X-User-Username", firstNonBlank(jwt.getClaimAsString("preferred_username"), jwt.getClaimAsString("email"), ""),
-                "X-User-Roles", extractRoles(jwt),
+                "X-User-Roles", roles,
                 "X-Identity-Provider", "keycloak"
         ));
     }
 
+    private boolean hasRequiredRole(Config config, String roles) {
+        if (config == null || config.allowedRoles == null || config.allowedRoles.isEmpty()) {
+            return true;
+        }
+        Set<String> userRoles = Arrays.stream(roles.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(HashSet::new));
+        return config.allowedRoles.stream().anyMatch(userRoles::contains);
+    }
+
     private ServerWebExchange withUserHeaders(ServerWebExchange exchange, Map<String, String> values) {
         ServerHttpRequest request = exchange.getRequest();
-        HttpHeaders headers = new HttpHeaders();
-        headers.putAll(request.getHeaders());
-        values.forEach(headers::set);
+        HttpHeaders writableHeaders = new HttpHeaders();
+        request.getHeaders().forEach((name, headerValues) ->
+                writableHeaders.put(name, new ArrayList<>(headerValues)));
+        values.forEach(writableHeaders::set);
+
         ServerHttpRequest decorated = new ServerHttpRequestDecorator(request) {
             @Override
             public HttpHeaders getHeaders() {
-                return headers;
+                return writableHeaders;
             }
         };
         return exchange.mutate().request(decorated).build();
@@ -172,6 +207,22 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         return exchange.getResponse().setComplete();
     }
 
+    private Mono<Void> forbidden(ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+        return exchange.getResponse().setComplete();
+    }
+
     public static class Config {
+        private List<String> allowedRoles = List.of();
+
+        public static Config authenticated() {
+            return new Config();
+        }
+
+        public static Config roles(String... roles) {
+            Config config = new Config();
+            config.allowedRoles = List.of(roles);
+            return config;
+        }
     }
 }

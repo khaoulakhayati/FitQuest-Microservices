@@ -30,6 +30,12 @@ public class AuthController {
         return authService.login(request);
     }
 
+    @PostMapping("/keycloak")
+    @Operation(summary = "Create a FitQuest session from a Keycloak access token")
+    public AuthResponse keycloakLogin(@Valid @RequestBody KeycloakLoginRequest request) {
+        return authService.loginWithKeycloakToken(request);
+    }
+
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token")
     public AuthResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {

@@ -1,0 +1,6 @@
+com\fitquest\gateway\filter\JwtAuthenticationFilter$Config.class
+com\fitquest\gateway\filter\JwtAuthenticationFilter$1.class
+com\fitquest\gateway\config\GatewayConfig.class
+com\fitquest\gateway\filter\JwtAuthenticationFilter.class
+com\fitquest\gateway\ApiGatewayApplication.class
+com\fitquest\gateway\config\SecurityConfig.class

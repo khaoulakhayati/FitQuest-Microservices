@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_WORKOUT_HOST:localhost}:${POSTGRES_WORKOUT_PORT:5432}/${POSTGRES_WORKOUT_DB:fitquest_workout}
+    username: ${POSTGRES_WORKOUT_USER:postgres}
+    password: ${POSTGRES_WORKOUT_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
